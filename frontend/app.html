@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0d1117">
+  <title>未来Lock — Smart Home Control</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <script>
+    (function () {
+      if (window.location.protocol === "file:") {
+        window.location.replace("http://localhost:3000/");
+        return;
+      }
+      window.SMARTLOCK_API = window.SMARTLOCK_API || `${window.location.protocol}//${window.location.hostname}:3000/api`;
+    })();
+  </script>
+
+</head>
+
+<body>
+  <section class="login-overlay" id="loginOverlay">
+    <form class="login-form" id="loginForm">
+      <h1>未来Lock</h1>
+      <p>ログインしてドアの状態を確認</p>
+      <label for="usernameInput">ユーザー名</label>
+      <input id="usernameInput" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      <label for="passwordInput">パスワード</label>
+      <input id="passwordInput" name="password" type="password" autocomplete="current-password" required>
+      <button class="primary-btn" id="loginButton" type="submit">ログイン</button>
+      <button class="secondary-btn" id="passkeyLoginButton" type="button">指紋でログイン・解錠</button>
+      <button class="secondary-btn" id="faceLoginButton" type="button">顔でログイン</button>
+      <section class="face-login-panel" id="faceLoginPanel" hidden>
+        <video class="face-login-video" id="loginFaceVideo" autoplay muted playsinline></video>
+        <p class="face-login-status" id="faceLoginStatus" role="status">カメラを正面に向けてください。</p>
+        <button class="primary-btn" id="submitFaceLoginButton" type="button">顔を確認してログイン</button>
+        <button class="text-btn" id="cancelFaceLoginButton" type="button">キャンセル</button>
+      </section>
+      <button class="text-btn" id="showUserRegisterButton" type="button">ユーザーIDを登録</button>
+      <p class="login-error" id="loginError" role="alert"></p>
+    </form>
+    <form class="login-form" id="userRegisterForm" hidden>
+      <h1>ユーザーID登録</h1>
+      <p>名前とパスワードを登録してください。</p>
+      <label for="registerName">名前</label>
+      <input id="registerName" name="name" maxlength="60" autocomplete="name" required>
+      <label for="registerPassword">パスワード（8文字以上）</label>
+      <input id="registerPassword" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+      <label for="confirmRegisterPassword">パスワード確認</label>
+
+      <input id="confirmRegisterPassword" name="confirmPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+      <button class="primary-btn" id="submitUserRegisterButton" type="submit">登録してアプリへ</button>
+      <button class="text-btn" id="backToLoginButton" type="button">ログインへ戻る</button>
+      <p class="login-error" id="userRegisterMessage" role="status"></p>
+    </form>
+  </section>
+
+  <div class="app-container">
+
+    <!-- HEADER -->
+    <header class="app-header">
+      <div>
+        <h1 class="title">未来Lock</h1>
+        <p class="subtitle">Smart Home Control</p>
+      </div>
+      <button class="user-avatar" id="profileButton" type="button" aria-label="プロフィールを開く" aria-haspopup="dialog" aria-controls="profileModal">?</button>
+    </header>
+
+    <!-- MAIN CARD -->
+    <section class="main-card">
+      <div class="lock-status">
+        <div class="lock-icon" id="lockEmoji">🔒</div>
+        <div class="lock-text">
+          <h2 id="lockStateText">LOCKED</h2>
+          <p class="lock-label">玄関ドア</p>
+        </div>
+      </div>
+
+      <button class="primary-btn" id="toggleLockButton" type="button">
+        <span class="material-symbols-outlined button-icon" id="lockActionIcon" aria-hidden="true">lock_open</span>
+        <span id="lockAction">解錠</span>
+      </button>
+      <button class="secondary-btn" id="unlockWithPasskeyButton" type="button" hidden>指紋で解錠</button>
+    </section>
+
+    <section class="alarm-banner" id="alarmBanner" role="alert" hidden>
+      <strong>セキュリティ警報</strong>
+      <span id="alarmBannerMessage"></span>
+      <button class="secondary-btn" id="viewAlarmsButton" type="button">警報を確認</button>
+    </section>
+
+    <!-- GRID MENU -->
+    <section class="grid-menu">
+      <button class="menu-item" type="button" data-screen="camera">
+        <div class="menu-icon">📷</div>
+        <p>ライブカメラ</p>
+      </button>
+
+      <button class="menu-item" type="button" data-screen="history">
+        <div class="menu-icon">📜</div>
+        <p>履歴</p>
+      </button>
+
+      <button class="menu-item" type="button" id="detectVisitorButton">
+        <div class="menu-icon">👁️</div>
+        <p>顔認証</p>
+      </button>
+
+      <button class="menu-item" type="button" data-screen="settings">
+        <div class="menu-icon">⚙️</div>
+        <p>設定</p>
+      </button>
+
+      <button class="menu-item" type="button" data-screen="alarms">
+        <div class="menu-icon">🚨</div>
+        <p>警報 <span class="alarm-count" id="alarmCount">0</span></p>
+      </button>
+    </section>
+
+    <!-- PANELS -->
+    <section class="panel" id="screen-camera">
+      <h3>ライブカメラ</h3>
+      <video class="camera-video" id="cameraVideo" autoplay muted playsinline></video>
+      <p class="camera-status" id="cameraStatus" role="status">カメラは停止中です</p>
+      <div class="camera-actions">
+        <button class="secondary-btn" id="startCameraButton" type="button">カメラを開始</button>
+        <button class="secondary-btn" id="enrollFaceButton" type="button">顔を登録</button>
+        <button class="primary-btn" id="recognizeFaceButton" type="button">顔を照合して解錠</button>
+      </div>
+    </section>
+
+    <section class="panel" id="screen-history">
+      <h3>履歴</h3>
+      <div class="history-list"></div>
+    </section>
+
+    <section class="panel" id="screen-settings">
+      <h3>設定</h3>
+      <div class="settings-list">
+        <div class="settings-item">
+          <span>ログイン中</span>
+          <strong id="currentUserLabel"></strong>
+        </div>
+        <div class="settings-item">
+          <span>指紋・端末認証器</span>
+          <strong id="passkeyStatus">未登録</strong>
+        </div>
+        <button class="secondary-btn" id="registerPasskeyButton" type="button">この端末の指紋認証器を登録</button>
+        <div class="settings-item">
+          <span>顔認証の登録状態</span>
+          <strong id="faceEnrollmentStatus">未登録</strong>
+        </div>
+        <p>登録した顔の特徴量だけをAPIに保存します。カメラ画像は保存しません。</p>
+        <button class="secondary-btn" id="settingsCameraButton" type="button">カメラを開く</button>
+      </div>
+
+      <section class="family-admin" id="familyAdminSection" hidden>
+        <h3>ユーザー管理</h3>
+        <form id="familyForm" class="family-form">
+          <label for="familyNameInput">表示名</label>
+          <input id="familyNameInput" name="displayName" maxlength="60" required>
+          <label for="familyUsernameInput">ユーザー名</label>
+          <input id="familyUsernameInput" name="username" minlength="3" maxlength="32" autocomplete="off" required>
+          <label for="familyPasswordInput">仮パスワード（8文字以上）</label>
+          <input id="familyPasswordInput" name="password" type="password" minlength="8" autocomplete="new-password" required>
+          <button class="primary-btn" id="createUserButton" type="submit">ユーザーIDを作成</button>
+          <p class="login-error" id="familyFormMessage" role="status"></p>
+        </form>
+        <div class="family-list" id="familyList"></div>
+      </section>
+    </section>
+
+    <section class="panel" id="screen-alarms">
+      <h3>セキュリティ警報</h3>
+      <div class="alarm-list" id="alarmList"></div>
+    </section>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast">
+      <span id="toastIcon">🔒</span>
+      <span id="toastMsg">施錠しました</span>
+    </div>
+
+    <!-- MODAL -->
+    <div class="modal-bg" id="visitorModal" onclick="closeVisitorModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3 id="visitorTitle">訪問者</h3>
+        <p id="visitorDetail">詳細情報</p>
+        <button class="primary-btn" id="closeVisitorModalButton" type="button">閉じる</button>
+      </div>
+    </div>
+
+    <div class="modal-bg profile-modal-bg" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+      <section class="modal profile-modal-card">
+        <div class="profile-avatar-large" id="profileInitial">?</div>
+        <h2 id="profileTitle">プロフィール</h2>
+        <p class="profile-display-name" id="profileDisplayName"></p>
+        <p class="profile-username" id="profileUsername"></p>
+        <dl class="profile-details">
+          <div><dt>権限</dt><dd id="profileRole"></dd></div>
+          <div><dt>顔認証</dt><dd id="profileFaceStatus"></dd></div>
+          <div><dt>指紋認証器</dt><dd id="profilePasskeyStatus"></dd></div>
+        </dl>
+        <div class="profile-actions">
+          <button class="secondary-btn" id="closeProfileButton" type="button">閉じる</button>
+          <button class="primary-btn" id="logoutButton" type="button">ログアウト</button>
+        </div>
+      </section>
+    </div>
+
+  </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+  <script defer src="/vendor/webauthn/index.umd.min.js"></script>
+  <script defer src="js/app.js"></script>
+</body>
+</html>
