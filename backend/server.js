@@ -35,6 +35,7 @@ const CORS_ORIGINS = Array.from(new Set([
   `http://localhost:${PORT}`,
   `http://127.0.0.1:${PORT}`
 ].map(origin => origin.trim()).filter(Boolean)));
+const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/;
 const DEFAULT_ORIGIN = `http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`;
 const ORIGIN = process.env.WEBAUTHN_ORIGIN || process.env.APP_ORIGIN || DEFAULT_ORIGIN;
 const RP_ID = process.env.WEBAUTHN_RP_ID || new URL(ORIGIN).hostname;
@@ -56,6 +57,7 @@ app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (CORS_ORIGINS.includes(origin)) return callback(null, true);
+    if (LOCAL_ORIGIN_PATTERN.test(origin)) return callback(null, true);
     if (origin.endsWith(".local") || /^(http|https):\/\/\d+\.\d+\.\d+\.\d+(:\d+)?$/.test(origin)) {
       return callback(null, true);
     }
