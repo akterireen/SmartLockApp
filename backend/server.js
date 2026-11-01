@@ -66,7 +66,7 @@ app.use(cors({
 app.use(express.json({ limit: "16kb" }));
 app.use("/vendor/webauthn", express.static(WEBAUTHN_BUNDLE_DIR));
 app.use(express.static(FRONTEND_DIR));
-app.get("/", (req, res) => res.sendFile(fileURLToPath(new URL("../frontend/app.html", import.meta.url))));
+app.get("/", (req, res) => res.sendFile(fileURLToPath(new URL("../frontend/index.html", import.meta.url))));
 
 async function loadDB() {
   let db;
